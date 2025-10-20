@@ -1,7 +1,218 @@
+// src/ThinkCodeAI.js
 import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 // ADDED: Import Firebase persistence functions
 import { saveRecentCode, loadRecentCode } from './firebase'; 
+
+// *******************************************************************
+// FIX: Moved language data structures out of the React component scope
+// *******************************************************************
+
+// CLEAN 11 LANGUAGES DEFINITION
+const languages = [
+    { value: 'java', label: 'Java', monacoLang: 'java' },
+    { value: 'python', label: 'Python', monacoLang: 'python' },
+    { value: 'cpp', label: 'C++', monacoLang: 'cpp' },
+    { value: 'c', label: 'C', monacoLang: 'c' },
+    { value: 'csharp', label: 'C#', monacoLang: 'csharp' },
+    { value: 'go', label: 'Go', monacoLang: 'go' },
+    
+    { value: 'javascript', label: 'JavaScript', monacoLang: 'javascript' },
+    { value: 'ruby', label: 'Ruby', monacoLang: 'ruby' },
+    { value: 'php', label: 'PHP', monacoLang: 'php' },
+    
+];
+
+const languageExamples = {
+    java: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        System.out.print("Enter your name: ");
+        String name = scanner.nextLine();
+        
+        System.out.print("Enter your age: ");
+        int age = scanner.nextInt();
+        
+        System.out.println("Hello " + name + ", you are " + age + " years old!");
+        
+        scanner.close();
+    }
+}`,
+    python: `# Start coding with Python...\n\nname = input("Enter your name: ")\nage = input("Enter your age: ")\n\nprint(f"Hello {name}, you are {age} years old!")`,
+    cpp: `#include <iostream>
+#include <string>
+using namespace std;
+
+int main() {
+    // Ensure standard output is not buffered
+    ios_base::sync_with_stdio(false); 
+
+    string name;
+    int age;
+    
+    cout << "Enter your name: " << flush; // Added flush
+    getline(cin, name);
+    
+    cout << "Enter your age: " << flush; // Added flush
+    cin >> age;
+    
+    cout << "Hello " << name << ", you are " << age << " years old!" << endl;
+    
+    return 0;
+}`,
+    
+    // FIX: PHP code example updated to use global prefix (\) for functions when in a namespace.
+    php: `<?php
+echo "Enter something: ";
+$input = trim(fgets(STDIN)); // takes input from user
+echo "You entered: " . $input . PHP_EOL;
+?>
+`,
+    go: `package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+)
+
+func main() {
+    reader := bufio.NewReader(os.Stdin)
+    
+    fmt.Print("Enter your name: ")
+    os.Stdout.Sync() // Added Sync
+    name, _ := reader.ReadString('\\n')
+    name = strings.TrimSpace(name)
+    
+    fmt.Print("Enter your age: ")
+    os.Stdout.Sync() // Added Sync
+    ageStr, _ := reader.ReadString('\\n')
+    age, _ := strconv.Atoi(strings.TrimSpace(ageStr))
+    
+    fmt.Printf("Hello %s, you are %d years old!\\n", name, age)
+}`,
+    c: `#include <stdio.h>
+#include <string.h>
+
+int main() {
+    char name[100];
+    int age;
+    
+    printf("Enter your name: ");
+    fflush(stdout); // Force immediate output
+    
+    if (fgets(name, sizeof(name), stdin)) {
+        // Remove newline if present
+        name[strcspn(name, "\\n")] = 0;
+    }
+    
+    printf("Enter your age: ");
+    fflush(stdout); // Force immediate output
+    
+    scanf("%d", &age);
+    
+    printf("Hello %s, you are %d years old!\\n", name, age);
+    fflush(stdout); // Force final output
+    
+    printf("Program completed successfully!\\n");
+    
+    return 0;
+}`,
+    csharp: `using System;
+
+class Program 
+{
+    static void Main() 
+    {
+        Console.Write("Enter your name: ");
+        // Added robust null checks
+        string name = Console.ReadLine() ?? ""; 
+        
+        Console.Write("Enter your age: ");
+        string ageInput = Console.ReadLine() ?? "0";
+        int age;
+        if (!int.TryParse(ageInput, out age)) {
+            age = 0;
+        }
+        
+        Console.WriteLine($"Hello {name}, you are {age} years old!");
+        
+        Console.Write("Enter a number: ");
+        string numberInput = Console.ReadLine() ?? "0";
+        int number;
+        if (!int.TryParse(numberInput, out number)) {
+            number = 0;
+        }
+        Console.WriteLine($"You entered: {number}");
+    }
+}`,
+    javascript: `const readline = require('readline');
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+console.log('Interactive JavaScript Program');
+
+rl.question('Enter your name: ', (name) => {
+    rl.question('Enter your age: ', (age) => {
+        console.log(\`Hello \${name}, you are \${age} years old!\`);
+        
+        rl.question('Enter a number: ', (number) => {
+            console.log(\`You entered: \${number}\`);
+            
+            // Proper cleanup and termination
+            rl.close();
+            if (process.stdin.readable) {
+                process.stdin.destroy();
+            }
+            
+            // Force exit after short delay
+            setTimeout(() => {
+                process.exit(0);
+            }, 100);
+        });
+    });
+});
+
+// Handle cleanup on termination signals
+process.on('SIGINT', () => {
+    rl.close();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    rl.close();
+    process.exit(0);
+});`,
+    ruby: `$stdout.sync = true  # Force immediate output
+$stdin.sync = true   # Force immediate input
+
+puts "Interactive Ruby Program"
+
+print "Enter your name: "
+$stdout.flush
+name = gets.chomp
+
+print "Enter your age: "
+$stdout.flush  
+age = gets.chomp.to_i
+
+puts "Hello #{name}, you are #{age} years old!"
+
+print "Enter a number: "
+$stdout.flush
+number = gets.chomp.to_i
+puts "You entered: #{number}"
+
+puts "Program completed successfully!"`
+};
 
 // Enhanced CSS
 const styles = `
@@ -38,7 +249,7 @@ const styles = `
   --cursor-color: #7aa2f7;
 }
 
-.codesage-container {
+.thinkcode-container {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -50,7 +261,7 @@ const styles = `
   transition: all 0.3s ease;
 }
 
-.codesage-header {
+.thinkcode-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -59,13 +270,13 @@ const styles = `
   border-bottom: 1px solid var(--border-color);
 }
 
-.codesage-logo {
+.thinkcode-logo {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.codesage-logo h1 {
+.thinkcode-logo h1 {
   font-size: 1.75rem;
   font-weight: 700;
   background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
@@ -74,14 +285,14 @@ const styles = `
   margin: 0;
 }
 
-.codesage-controls {
+.thinkcode-controls {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-.codesage-main {
+.thinkcode-main {
   flex-grow: 1;
   display: flex;
   gap: 0;
@@ -664,7 +875,7 @@ const styles = `
     background-color: #3b3f51;
 }
 
-.logout-icon, .recent-code-icon {
+.logout-icon, .recent-code-icon, .collab-icon {
     width: 16px;
     height: 16px;
 }
@@ -693,6 +904,7 @@ const styles = `
     min-width: 250px;
     font-size: 0.9rem;
     font-weight: 500;
+    pointer-events: all; /* Make box clickable/interactive */
 }
 
 .notification-box.show {
@@ -710,7 +922,7 @@ const styles = `
 `;
 
 // Icon Components 
-const CodeSageLogo = () => (
+const Logo = () => (
     <svg className="logo-icon" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -787,6 +999,16 @@ const BookOpenIcon = () => (
     <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+    </svg>
+);
+
+// NEW ICON: Collaboration
+const CollaborationIcon = () => (
+    <svg className="collab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
     </svg>
 );
 
@@ -1075,7 +1297,7 @@ const AITextDisplay = ({ content }) => {
                 });
                 setProcessedContent(doc.body.innerHTML);
             } else {
-                setProcessedContent(content);
+                setProcessedContent(content); // Fallback for non-HTML/text
             }
         } catch (e) {
             setProcessedContent(content); // Fail gracefully
@@ -1154,252 +1376,8 @@ const Notification = ({ message, type, onClose }) => {
 
 // Main Application Component
 function ThinkCodeAI({ user, onLogout, uid }) {
-    // LANGUAGE EXAMPLES (FIXED C#, C, C++, and Go I/O, PHP Global Scope)
-    const languageExamples = {
-        java: `import java.util.Scanner;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        
-        System.out.print("Enter your name: ");
-        String name = scanner.nextLine();
-        
-        System.out.print("Enter your age: ");
-        int age = scanner.nextInt();
-        
-        System.out.println("Hello " + name + ", you are " + age + " years old!");
-        
-        scanner.close();
-    }
-}`,
-        python: `# Start coding with Python...\n\nname = input("Enter your name: ")\nage = input("Enter your age: ")\n\nprint(f"Hello {name}, you are {age} years old!")`,
-        cpp: `#include <iostream>
-#include <string>
-using namespace std;
-
-int main() {
-    // Ensure standard output is not buffered
-    ios_base::sync_with_stdio(false); 
-
-    string name;
-    int age;
-    
-    cout << "Enter your name: " << flush; // Added flush
-    getline(cin, name);
-    
-    cout << "Enter your age: " << flush; // Added flush
-    cin >> age;
-    
-    cout << "Hello " << name << ", you are " << age << " years old!" << endl;
-    
-    return 0;
-}`,
-        kotlin: `fun main() {
-    print("Enter your name: ")
-    val name = readLine()
-    
-    print("Enter your age: ")
-    val age = readLine()?.toIntOrNull() ?: 0
-    
-    println("Hello $name, you are $age years old!")
-    
-    print("Enter a number: ")
-    val number = readLine()?.toIntOrNull() ?: 0
-    println("You entered: $number")
-}`,
-        // FIX: PHP code example updated to use global prefix (\) for functions when in a namespace.
-        php: `<?php
-// Save as compiler_test.php
-namespace CompilerTest;
-
-use Exception;
-
-function factorial($n){
-    if($n<=1) return 1;
-    return $n * factorial($n-1);
-}
-
-// NOTE: Global functions must be prefixed with a backslash (\\) when inside a namespace.
-\\file_put_contents("ct_php.json", \\json_encode(["msg"=>"php","unicode"=>"こんにちは"]));
-$data = \\json_decode(\\file_get_contents("ct_php.json"), true);
-echo "MSG: ".$data['msg']."\\n";
-
-echo "FACT5: ".factorial(5)."\\n";
-
-// simple TCP socket attempt to localhost: (non-fatal)
-// This will fail because the sockets extension is usually not enabled in sandboxes,
-// but it will fail gracefully because it uses the global prefix (\\).
-$sock = @\\socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-if($sock){
-    $res = @\\socket_bind($sock, "127.0.0.1", 0);
-    echo $res ? "SOCKET_BIND_OK\\n" : "SOCKET_BIND_FAIL\\n";
-    \\socket_close($sock);
-}
-
-\\unlink("ct_php.json");
-?>`,
-        rust: `use std::io::{self, Write};
-
-fn main() {
-    print!("Enter your name: ");
-    io::stdout().flush().unwrap();
-    
-    let mut name = String::new();
-    io::stdin().read_line(&mut name).expect("Failed to read name");
-    let name = name.trim();
-    
-    print!("Enter your age: ");
-    io::stdout().flush().unwrap();
-    
-    let mut age = String::new();
-    io::stdin().read_line(&mut age).expect("Failed to read age");
-    let age: u32 = age.trim().parse().expect("Please enter a number");
-    
-    println!("Hello {}, you are {} years old!", name, age);
-}`,
-        go: `package main
-
-import (
-    "bufio"
-    "fmt"
-    "os"
-    "strconv"
-    "strings"
-)
-
-func main() {
-    reader := bufio.NewReader(os.Stdin)
-    
-    fmt.Print("Enter your name: ")
-    os.Stdout.Sync() // Added Sync
-    name, _ := reader.ReadString('\\n')
-    name = strings.TrimSpace(name)
-    
-    fmt.Print("Enter your age: ")
-    os.Stdout.Sync() // Added Sync
-    ageStr, _ := reader.ReadString('\\n')
-    age, _ := strconv.Atoi(strings.TrimSpace(ageStr))
-    
-    fmt.Printf("Hello %s, you are %d years old!\\n", name, age)
-}`,
-        c: `#include <stdio.h>
-#include <string.h>
-
-int main() {
-    char name[100];
-    int age;
-    
-    printf("Enter your name: ");
-    fflush(stdout); // Force immediate output
-    
-    if (fgets(name, sizeof(name), stdin)) {
-        // Remove newline if present
-        name[strcspn(name, "\\n")] = 0;
-    }
-    
-    printf("Enter your age: ");
-    fflush(stdout); // Force immediate output
-    
-    scanf("%d", &age);
-    
-    printf("Hello %s, you are %d years old!\\n", name, age);
-    fflush(stdout); // Force final output
-    
-    printf("Program completed successfully!\\n");
-    
-    return 0;
-}`,
-        csharp: `using System;
-
-class Program 
-{
-    static void Main() 
-    {
-        Console.Write("Enter your name: ");
-        // Added robust null checks
-        string name = Console.ReadLine() ?? ""; 
-        
-        Console.Write("Enter your age: ");
-        string ageInput = Console.ReadLine() ?? "0";
-        int age;
-        if (!int.TryParse(ageInput, out age)) {
-            age = 0;
-        }
-        
-        Console.WriteLine($"Hello {name}, you are {age} years old!");
-        
-        Console.Write("Enter a number: ");
-        string numberInput = Console.ReadLine() ?? "0";
-        int number;
-        if (!int.TryParse(numberInput, out number)) {
-            number = 0;
-        }
-        Console.WriteLine($"You entered: {number}");
-    }
-}`,
-        javascript: `const readline = require('readline');
-
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
-
-console.log('Interactive JavaScript Program');
-
-rl.question('Enter your name: ', (name) => {
-    rl.question('Enter your age: ', (age) => {
-        console.log(\`Hello \${name}, you are \${age} years old!\`);
-        
-        rl.question('Enter a number: ', (number) => {
-            console.log(\`You entered: \${number}\`);
-            
-            // Proper cleanup and termination
-            rl.close();
-            if (process.stdin.readable) {
-                process.stdin.destroy();
-            }
-            
-            // Force exit after short delay
-            setTimeout(() => {
-                process.exit(0);
-            }, 100);
-        });
-    });
-});
-
-// Handle cleanup on termination signals
-process.on('SIGINT', () => {
-    rl.close();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    rl.close();
-    process.exit(0);
-});`,
-        ruby: `$stdout.sync = true  # Force immediate output
-$stdin.sync = true   # Force immediate input
-
-puts "Interactive Ruby Program"
-
-print "Enter your name: "
-$stdout.flush
-name = gets.chomp
-
-print "Enter your age: "
-$stdout.flush  
-age = gets.chomp.to_i
-
-puts "Hello #{name}, you are #{age} years old!"
-
-print "Enter a number: "
-$stdout.flush
-number = gets.chomp.to_i
-puts "You entered: #{number}"
-
-puts "Program completed successfully!"`
-    };
+    // LANGUAGE EXAMPLES are now defined outside the component
+    // languageExamples is available globally
 
     const [language, setLanguage] = useState("python");
     // Change initial state to a placeholder message for initial load
@@ -1409,6 +1387,9 @@ puts "Program completed successfully!"`
     const [analysisOutput, setAnalysisOutput] = useState("");
     const [explainOutput, setExplainOutput] = useState("");
     const [activeTab, setActiveTab] = useState('terminal'); // Default tab
+    
+    // NEW STATE: Collab Session ID
+    const [collabSessionId, setCollabSessionId] = useState(null); 
 
     // FIX 1: Change currentCodeToSave from state to a mutable Ref
     const currentCodeToSaveRef = useRef({ code: '', language: '' });
@@ -1445,22 +1426,11 @@ puts "Program completed successfully!"`
     // Updated Codespace URLs for Production Deployment
     const BACKEND_BASE_URL = 'https://redesigned-space-xylophone-q7r97969rrjc9r9q-8080.app.github.dev';
     const WS_URL = `wss://redesigned-space-xylophone-q7r97969rrjc9r9q-8080.app.github.dev/execute-ws`;
+    // Placeholder for the Collab URL (would be used in a real-world scenario)
+    const COLLAB_BASE_URL = window.location.origin;
 
-    // CLEAN 11 LANGUAGES
-    const languages = [
-        { value: 'java', label: 'Java', monacoLang: 'java' },
-        { value: 'python', label: 'Python', monacoLang: 'python' },
-        { value: 'cpp', label: 'C++', monacoLang: 'cpp' },
-        { value: 'c', label: 'C', monacoLang: 'c' },
-        { value: 'csharp', label: 'C#', monacoLang: 'csharp' },
-        { value: 'go', label: 'Go', monacoLang: 'go' },
-        { value: 'rust', label: 'Rust', monacoLang: 'rust' },
-        { value: 'javascript', label: 'JavaScript', monacoLang: 'javascript' },
-        { value: 'ruby', label: 'Ruby', monacoLang: 'ruby' },
-        { value: 'php', label: 'PHP', monacoLang: 'php' },
-        { value: 'kotlin', label: 'Kotlin', monacoLang: 'kotlin' },
-    ];
-    
+    // languages is now available globally
+
     // Dropdown handlers
     const toggleDropdown = () => {
         setShowDropdown(!showDropdown);
@@ -1506,6 +1476,55 @@ puts "Program completed successfully!"`
             setNotificationMessage(`Recent code loaded successfully for ${savedData.language}.`, "success");
         } else {
             setNotificationMessage("No recent code found in the database for your account.", "error");
+        }
+    };
+    
+    /**
+     * UPDATED HANDLER: Create and share a collaboration session link, and REDIRECT THE HOST.
+     */
+    const handleCollabSession = () => {
+        if (connectionStatus !== 'connected' || !code.trim()) {
+            setNotificationMessage("Cannot start collaboration: WebSocket is not connected or code is empty.", "error");
+            setShowDropdown(false);
+            return;
+        }
+
+        // 1. Generate a unique ID (e.g., simple UUID or timestamp-based)
+        const newSessionId = user.uid.substring(0, 8) + "-" + Date.now();
+
+        // 2. Send request to backend to create/register the session
+        const createSessionMessage = {
+            type: 'create_collab_session',
+            sessionId: newSessionId,
+            code: code,
+            language: language,
+            hostId: user.uid
+        };
+
+        try {
+            ws.current.send(JSON.stringify(createSessionMessage));
+            
+            setCollabSessionId(newSessionId);
+            setShowDropdown(false);
+
+            // 3. Construct and copy the URL
+            const collabLink = `${COLLAB_BASE_URL}/collab/${newSessionId}`;
+            navigator.clipboard.writeText(collabLink)
+                .then(() => {
+                    setNotificationMessage(`Session started! Link copied. Redirecting...`, "success");
+                    
+                    // CRITICAL: Redirect the host to the new CollabSession page
+                    window.history.pushState({}, '', `/collab/${newSessionId}`);
+                    window.location.reload(); 
+                })
+                .catch(err => {
+                    console.error("Failed to copy link:", err);
+                    setNotificationMessage("Collab failed. See console.", "error");
+                });
+
+        } catch (error) {
+            console.error("Failed to send collab session request:", error);
+            setNotificationMessage("Failed to communicate with server to start session.", "error");
         }
     };
     
@@ -1677,6 +1696,14 @@ puts "Program completed successfully!"`
                             setActiveTab('terminal');
                             // Note: Code is stored in ref in runCode, waiting for completion/error message here.
                             break;
+                            
+                        case 'code_sync':
+                            // Only relevant in a future CollabSession component, but keeping logic here
+                            // setCode(message.code);
+                            // setLanguage(message.language);
+                            setNotificationMessage(`Code updated by collaborator.`, "success");
+                            break;
+
                         default: break;
                     }
                 } catch (error) {
@@ -1813,10 +1840,6 @@ puts "Program completed successfully!"`
                 throw new Error(data.result || `HTTP Error ${response.status}`);
             }
             
-            const title = mode === 'analysis' ? 
-                "\n--- CODE ANALYSIS (Gemini) ---" : 
-                "\n--- CODE EXPLANATION (Gemini) ---";
-
             const cleanContent = DOMPurify.sanitize(data.result);
 
 setOutputState(cleanContent);
@@ -1927,18 +1950,18 @@ setOutputState(cleanContent);
     return (
         <>
             <style>{styles}</style>
-            <div className={`codesage-container theme-${theme}`}>
+            <div className={`thinkcode-container theme-${theme}`}>
                 <Notification 
                     message={notification.message} 
                     type={notification.type} 
                     onClose={clearNotification}
                 />
-                <header className="codesage-header">
-                    <div className="codesage-logo">
-                        <CodeSageLogo />
+                <header className="thinkcode-header">
+                    <div className="thinkcode-logo">
+                        <Logo />
                         <h1>ThinkCode AI</h1>
                     </div>
-                    <div className="codesage-controls">
+                    <div className="thinkcode-controls">
                         <LanguageSelector 
                             language={language} 
                             setLanguage={handleLanguageChange} 
@@ -2040,6 +2063,12 @@ setOutputState(cleanContent);
                                     </svg>
                                     Recent Code
                                 </button>
+
+                                {/* NEW: Collab Button */}
+                                <button className="dropdown-item" onClick={handleCollabSession}>
+                                    <CollaborationIcon />
+                                    Start Collab Session
+                                </button>
                                 
                                 {/* Logout Button */}
                                 <button className="dropdown-item" onClick={() => {onLogout(); setShowDropdown(false);}}>
@@ -2056,7 +2085,7 @@ setOutputState(cleanContent);
                     </div>
                 </header>
 
-                <main className="codesage-main" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+                <main className="thinkcode-main" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                     <div className="panel editor-panel" style={{ width: `${editorWidth}%` }}>
                         <MonacoEditor // Switched to custom Monaco component
                             language={getMonacoLanguage()} 
@@ -2114,5 +2143,23 @@ setOutputState(cleanContent);
         </>
     );
 }
+
+// Export shared components for use in CollabSession.js
+export { 
+    MonacoEditor,
+    InlineTerminal,
+    Notification,
+    CopyIcon,
+    ClearIcon,
+    PlayIcon,
+    StopIcon,
+    CollaborationIcon,
+    Logo,
+    styles,
+    SunIcon,
+    MoonIcon,
+    LanguageSelector, 
+    languages 
+};
 
 export default ThinkCodeAI;
